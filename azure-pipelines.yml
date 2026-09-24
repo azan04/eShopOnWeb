@@ -108,3 +108,43 @@ stages:
               appType: webAppLinux          # change to webApp if Bicep creates a Windows app
               appName: $(webAppName)
               package: '$(Pipeline.Workspace)/Website/*.zip'
+
+
+
+# ------------------------------------------------------------------ DAST
+- stage: DAST
+  displayName: OWASP ZAP baseline scan
+  dependsOn: Deploy
+  condition: succeeded()
+  jobs:
+  - job: ZAP
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - checkout: none
+
+    - script: curl --retry 10 --retry-delay 10 --retry-connrefused -sf https://$(webAppName).azurewebsites.net
+      displayName: Wait for app
+
+    - script: |
+        mkdir -p $(Pipeline.Workspace)/zap
+        chmod 777 $(Pipeline.Workspace)/zap
+      displayName: Prepare report folder
+
+    - script: |
+        docker run --rm \
+          -v $(Pipeline.Workspace)/zap:/zap/wrk:rw \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+            -t https://$(webAppName).azurewebsites.net \
+            -r zap-report.html \
+            -J zap-report.json \
+            -I
+      displayName: Run ZAP baseline scan
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish ZAP reports
+      condition: always()
+      inputs:
+        targetPath: '$(Pipeline.Workspace)/zap'
+        artifact: ZAP-Report
