@@ -7,8 +7,10 @@ variables:
   buildConfiguration: Release
   azureSubscription: 'Az_Connection'
   resourceGroup: 'rg-azan-test'
-  location: 'uksouth'            # e.g. centralindia
-  webAppName: 'eshopazantest'    # globally unique, lowercase
+  location: 'uksouth'
+  webAppName: 'eshopazantest'
+  slotName: 'staging'
+  stagingUrl: 'https://eshopazantest-staging.azurewebsites.net'
 
 stages:
 # ---------------------------------------------------------------- BUILD
@@ -63,7 +65,7 @@ stages:
 
 # ---------------------------------------------------------------- INFRA
 - stage: Infra
-  displayName: Provision Web App (Bicep)
+  displayName: Provision Web App and staging slot
   dependsOn: Build
   condition: succeeded()
   jobs:
@@ -75,7 +77,7 @@ stages:
       artifact: Bicep
 
     - task: AzureResourceManagerTemplateDeployment@3
-      displayName: Deploy Bicep
+      displayName: Deploy Bicep (Web App)
       inputs:
         deploymentScope: Resource Group
         azureResourceManagerConnection: $(azureSubscription)
@@ -87,13 +89,29 @@ stages:
         overrideParameters: '-webAppName $(webAppName)'
         deploymentMode: Incremental
 
-# --------------------------------------------------------------- DEPLOY
-- stage: Deploy
-  displayName: Deploy to Web App
+    - task: AzureCLI@2
+      displayName: Create staging slot (if missing)
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          if az webapp deployment slot list -g $(resourceGroup) -n $(webAppName) --query "[?name=='$(slotName)']" -o tsv | grep -q .; then
+            echo "Slot $(slotName) already exists"
+          else
+            az webapp deployment slot create \
+              -g $(resourceGroup) -n $(webAppName) \
+              --slot $(slotName) \
+              --configuration-source $(webAppName)
+          fi
+
+# ------------------------------------------------- DEPLOY TO STAGING SLOT
+- stage: DeployStaging
+  displayName: Deploy to staging slot
   dependsOn: Infra
   condition: succeeded()
   jobs:
-  - deployment: DeployWeb
+  - deployment: DeploySlot
     environment: staging
     pool:
       vmImage: ubuntu-latest
@@ -102,19 +120,20 @@ stages:
         deploy:
           steps:
           - task: AzureWebApp@1
-            displayName: Deploy to App Service
+            displayName: Deploy to staging slot
             inputs:
               azureSubscription: $(azureSubscription)
-              appType: webAppLinux          # change to webApp if Bicep creates a Windows app
+              appType: webAppLinux
               appName: $(webAppName)
+              deployToSlotOrASE: true
+              resourceGroupName: $(resourceGroup)
+              slotName: $(slotName)
               package: '$(Pipeline.Workspace)/Website/*.zip'
 
-
-
-# ------------------------------------------------------------------ DAST
+# ------------------------------------------------------------- ZAP SCAN
 - stage: DAST
-  displayName: OWASP ZAP baseline scan
-  dependsOn: Deploy
+  displayName: OWASP ZAP scan (staging slot)
+  dependsOn: DeployStaging
   condition: succeeded()
   jobs:
   - job: ZAP
@@ -123,8 +142,9 @@ stages:
     steps:
     - checkout: none
 
-    - script: curl --retry 10 --retry-delay 10 --retry-connrefused -sf https://$(webAppName).azurewebsites.net
-      displayName: Wait for app
+    - script: |
+        curl --retry 15 --retry-delay 10 --retry-all-errors -sf -o /dev/null $(stagingUrl)
+      displayName: Wait for staging slot
 
     - script: |
         mkdir -p $(Pipeline.Workspace)/zap
@@ -136,11 +156,17 @@ stages:
           -v $(Pipeline.Workspace)/zap:/zap/wrk:rw \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
-            -t https://$(webAppName).azurewebsites.net \
+            -t $(stagingUrl) \
             -r zap-report.html \
             -J zap-report.json \
+            -w zap-summary.md \
             -I
       displayName: Run ZAP baseline scan
+
+    - script: |
+        echo "##vso[task.uploadsummary]$(Pipeline.Workspace)/zap/zap-summary.md"
+      displayName: Show ZAP summary on run page
+      condition: always()
 
     - task: PublishPipelineArtifact@1
       displayName: Publish ZAP reports
@@ -148,3 +174,27 @@ stages:
       inputs:
         targetPath: '$(Pipeline.Workspace)/zap'
         artifact: ZAP-Report
+
+# --------------------------------------------- APPROVE AND SWAP TO PRODUCTION
+- stage: SwapToProd
+  displayName: Approve and swap to production
+  dependsOn: DAST
+  condition: succeeded()
+  jobs:
+  - deployment: Swap
+    environment: production
+    pool:
+      vmImage: ubuntu-latest
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureAppServiceManage@0
+            displayName: Swap staging slot into production
+            inputs:
+              azureSubscription: $(azureSubscription)
+              Action: 'Swap Slots'
+              WebAppName: $(webAppName)
+              ResourceGroupName: $(resourceGroup)
+              SourceSlot: $(slotName)
+              SwapWithProduction: true
