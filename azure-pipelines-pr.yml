@@ -1,0 +1,53 @@
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: Release
+  sonarCloudConnection: 'SonarCloud_Connection'
+  sonarOrganization: 'puffersoft-cicd'
+  sonarProjectKey: 'puffersoft-cicd_azan-eshop-app'
+
+steps:
+- task: SonarCloudPrepare@3
+  displayName: Prepare SonarCloud analysis
+  inputs:
+    SonarCloud: $(sonarCloudConnection)
+    organization: $(sonarOrganization)
+    scannerMode: 'MSBuild'
+    projectKey: $(sonarProjectKey)
+
+- task: DotNetCoreCLI@2
+  displayName: Restore
+  inputs:
+    command: restore
+    projects: '**/*.sln'
+    feedsToUse: select
+
+- task: DotNetCoreCLI@2
+  displayName: Build
+  inputs:
+    command: build
+    projects: '**/*.sln'
+    arguments: '--configuration $(buildConfiguration) --no-restore'
+
+- task: DotNetCoreCLI@2
+  displayName: Unit tests
+  inputs:
+    command: test
+    projects: 'tests/UnitTests/*.csproj'
+    arguments: '--configuration $(buildConfiguration) --no-build'
+
+- task: SonarCloudAnalyze@3
+  displayName: Run SonarCloud analysis
+
+- task: SonarCloudPublish@3
+  displayName: Publish SonarCloud quality gate result
+  inputs:
+    pollingTimeoutSec: '300'
