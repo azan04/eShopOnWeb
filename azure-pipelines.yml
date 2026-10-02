@@ -1,9 +1,7 @@
 trigger:
-- none
-#  branches:
-#    include:
-#      - main
-
+  branches:
+    include:
+      - main
 
 variables:
   buildConfiguration: Release
@@ -13,6 +11,9 @@ variables:
   webAppName: 'eshopazantest'
   slotName: 'staging'
   stagingUrl: 'https://eshopazantest-staging.azurewebsites.net'
+  sonarCloudConnection: 'SonarCloud_Connection'
+  sonarOrganization: 'puffersoft-cicd'
+  sonarProjectKey: 'puffersoft-cicd_azan-eshop-app'
 
 stages:
 # ---------------------------------------------------------------- BUILD
@@ -23,6 +24,14 @@ stages:
     pool:
       vmImage: ubuntu-latest
     steps:
+    - task: SonarCloudPrepare@3
+      displayName: Prepare SonarCloud analysis
+      inputs:
+        SonarCloud: $(sonarCloudConnection)
+        organization: $(sonarOrganization)
+        scannerMode: 'dotnet'
+        projectKey: $(sonarProjectKey)
+
     - task: DotNetCoreCLI@2
       displayName: Restore
       inputs:
@@ -43,6 +52,14 @@ stages:
         command: test
         projects: 'tests/UnitTests/*.csproj'
         arguments: '--configuration $(buildConfiguration) --no-build'
+
+    - task: SonarCloudAnalyze@3
+      displayName: Run SonarCloud analysis
+
+    - task: SonarCloudPublish@3
+      displayName: Publish SonarCloud quality gate result
+      inputs:
+        pollingTimeoutSec: '300'
 
     - task: DotNetCoreCLI@2
       displayName: Publish web project
