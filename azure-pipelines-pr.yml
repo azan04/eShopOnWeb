@@ -20,7 +20,7 @@ steps:
   inputs:
     SonarCloud: $(sonarCloudConnection)
     organization: $(sonarOrganization)
-    scannerMode: 'MSBuild'
+    scannerMode: 'dotnet'
     projectKey: $(sonarProjectKey)
 
 - task: DotNetCoreCLI@2
