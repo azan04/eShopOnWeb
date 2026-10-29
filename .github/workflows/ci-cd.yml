@@ -74,6 +74,7 @@ jobs:
 
       - name: End SonarCloud analysis
         if: always()
+        continue-on-error: true
         shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
