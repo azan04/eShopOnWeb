@@ -1,0 +1,69 @@
+name: Pull request checks
+
+on:
+  # pull_request:
+  #   branches:
+  #     - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  DOTNET_VERSION: 8.0.x
+  BUILD_CONFIGURATION: Release
+  SONAR_ORGANIZATION: Muhammad Azan
+  SONAR_PROJECT_KEY: puffersoft-cicd_azan-eshop-app
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install SonarScanner for .NET
+        shell: bash
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Begin SonarCloud analysis
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          dotnet-sonarscanner begin
+          /k:"${{ env.SONAR_PROJECT_KEY }}"
+          /o:"${{ env.SONAR_ORGANIZATION }}"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.token="$SONAR_TOKEN"
+          /d:sonar.qualitygate.wait=true
+
+      - name: Restore
+        run: dotnet restore eShopOnWeb.sln
+
+      - name: Build
+        run: dotnet build eShopOnWeb.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Run unit tests
+        run: >
+          dotnet test tests/UnitTests/UnitTests.csproj
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --no-build
+          --logger trx
+
+      - name: End SonarCloud analysis
+        if: always()
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
