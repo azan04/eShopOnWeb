@@ -19,7 +19,7 @@ env:
   DOTNET_VERSION: 8.0.x
   BUILD_CONFIGURATION: Release
   SONAR_ORGANIZATION: azan04
-  SONAR_PROJECT_KEY: puffersoft-cicd_azan-eshop-app
+  SONAR_PROJECT_KEY: azan04_eShopOnWeb
   AZURE_RESOURCE_GROUP: rg-azan-tools
   AZURE_LOCATION: uksouth
   AZURE_WEBAPP_NAME: eshopazantest1234

@@ -13,7 +13,7 @@ env:
   DOTNET_VERSION: 8.0.x
   BUILD_CONFIGURATION: Release
   SONAR_ORGANIZATION: azan04
-  SONAR_PROJECT_KEY: puffersoft-cicd_azan-eshop-app
+  SONAR_PROJECT_KEY: azan04_eShopOnWeb
 
 jobs:
   check:

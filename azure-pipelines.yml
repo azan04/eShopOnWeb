@@ -13,7 +13,7 @@ variables:
   stagingUrl: 'https://eshopazantest-staging.azurewebsites.net'
   sonarCloudConnection: 'SonarCloud_Connection'
   sonarOrganization: 'puffersoft-cicd'
-  sonarProjectKey: 'puffersoft-cicd_azan-eshop-app'
+  sonarProjectKey: 'azan04_eShopOnWeb'
 
 stages:
 # ---------------------------------------------------------------- BUILD

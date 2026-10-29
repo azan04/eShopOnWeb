@@ -12,7 +12,7 @@ variables:
   buildConfiguration: Release
   sonarCloudConnection: 'SonarCloud_Connection'
   sonarOrganization: 'puffersoft-cicd'
-  sonarProjectKey: 'puffersoft-cicd_azan-eshop-app'
+  sonarProjectKey: 'azan04_eShopOnWeb'
 
 steps:
 - task: SonarCloudPrepare@3
