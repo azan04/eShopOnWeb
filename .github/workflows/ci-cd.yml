@@ -1,245 +1,245 @@
-# name: Build, scan, and deploy
+name: Build, scan, and deploy
 
-# on:
-#   push:
-#     branches:
-#       - main
-#   workflow_dispatch:
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
-# permissions:
-#   contents: read
-#   pull-requests: write
-#   id-token: write
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
 
-# concurrency:
-#   group: production-deployment
-#   cancel-in-progress: false
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
 
-# env:
-#   DOTNET_VERSION: 8.0.x
-#   BUILD_CONFIGURATION: Release
-#   SONAR_ORGANIZATION: Muhammad Azan
-#   SONAR_PROJECT_KEY: puffersoft-cicd_azan-eshop-app
-#   AZURE_RESOURCE_GROUP: rg-azan-tools
-#   AZURE_LOCATION: uksouth
-#   AZURE_WEBAPP_NAME: eshopazantest1234
-#   AZURE_SLOT_NAME: staging
-#   STAGING_URL: https://eshopazantest1234-staging.azurewebsites.net
+env:
+  DOTNET_VERSION: 8.0.x
+  BUILD_CONFIGURATION: Release
+  SONAR_ORGANIZATION: azan04
+  SONAR_PROJECT_KEY: puffersoft-cicd_azan-eshop-app
+  AZURE_RESOURCE_GROUP: rg-azan-tools
+  AZURE_LOCATION: uksouth
+  AZURE_WEBAPP_NAME: eshopazantest1234
+  AZURE_SLOT_NAME: staging
+  STAGING_URL: https://eshopazantest1234-staging.azurewebsites.net
 
-# jobs:
-#   build:
-#     name: Build, test, and analyze
-#     runs-on: ubuntu-latest
+jobs:
+  build:
+    name: Build, test, and analyze
+    runs-on: ubuntu-latest
 
-#     steps:
-#       - name: Check out source
-#         uses: actions/checkout@v4
-#         with:
-#           fetch-depth: 0
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-#       - name: Set up .NET
-#         uses: actions/setup-dotnet@v4
-#         with:
-#           dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-#       - name: Install SonarScanner for .NET
-#         shell: bash
-#         run: dotnet tool install --global dotnet-sonarscanner
+      - name: Install SonarScanner for .NET
+        shell: bash
+        run: dotnet tool install --global dotnet-sonarscanner
 
-#       - name: Begin SonarCloud analysis
-#         shell: bash
-#         env:
-#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#         run: >
-#           dotnet-sonarscanner begin
-#           /k:"${{ env.SONAR_PROJECT_KEY }}"
-#           /o:"${{ env.SONAR_ORGANIZATION }}"
-#           /d:sonar.host.url="https://sonarcloud.io"
-#           /d:sonar.token="$SONAR_TOKEN"
-#           /d:sonar.qualitygate.wait=true
+      - name: Begin SonarCloud analysis
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          dotnet-sonarscanner begin
+          /k:"${{ env.SONAR_PROJECT_KEY }}"
+          /o:"${{ env.SONAR_ORGANIZATION }}"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.token="$SONAR_TOKEN"
+          /d:sonar.qualitygate.wait=true
 
-#       - name: Restore
-#         run: dotnet restore eShopOnWeb.sln
+      - name: Restore
+        run: dotnet restore eShopOnWeb.sln
 
-#       - name: Build
-#         run: dotnet build eShopOnWeb.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+      - name: Build
+        run: dotnet build eShopOnWeb.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
-#       - name: Run unit tests
-#         run: >
-#           dotnet test tests/UnitTests/UnitTests.csproj
-#           --configuration ${{ env.BUILD_CONFIGURATION }}
-#           --no-build
-#           --logger trx
+      - name: Run unit tests
+        run: >
+          dotnet test tests/UnitTests/UnitTests.csproj
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --no-build
+          --logger trx
 
-#       - name: End SonarCloud analysis
-#         if: always()
-#         shell: bash
-#         env:
-#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#         run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+      - name: End SonarCloud analysis
+        if: always()
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
-#       - name: Publish web application
-#         run: >
-#           dotnet publish src/Web/Web.csproj
-#           --configuration ${{ env.BUILD_CONFIGURATION }}
-#           --no-restore
-#           --output ./publish
+      - name: Publish web application
+        run: >
+          dotnet publish src/Web/Web.csproj
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --no-restore
+          --output ./publish
 
-#       - name: Create deployment package
-#         shell: bash
-#         run: |
-#           cd publish
-#           zip -r ../webapp.zip .
+      - name: Create deployment package
+        shell: bash
+        run: |
+          cd publish
+          zip -r ../webapp.zip .
 
-#       - name: Upload web application artifact
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: webapp
-#           path: webapp.zip
-#           if-no-files-found: error
-#           retention-days: 7
+      - name: Upload web application artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp
+          path: webapp.zip
+          if-no-files-found: error
+          retention-days: 7
 
-#   provision:
-#     name: Provision Azure Web App
-#     runs-on: ubuntu-latest
-#     needs: build
+  provision:
+    name: Provision Azure Web App
+    runs-on: ubuntu-latest
+    needs: build
 
-#     steps:
-#       - name: Check out source
-#         uses: actions/checkout@v4
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
 
-#       - name: Sign in to Azure
-#         uses: azure/login@v2
-#         with:
-#           client-id: ${{ secrets.AZURE_CLIENT_ID }}
-#           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-#           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-#       - name: Deploy Web App infrastructure
-#         uses: azure/arm-deploy@v2
-#         with:
-#           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-#           resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
-#           template: infra/webapp.bicep
-#           parameters: webAppName=${{ env.AZURE_WEBAPP_NAME }} location=${{ env.AZURE_LOCATION }}
-#           deploymentMode: Incremental
-#           failOnStdErr: false
+      - name: Deploy Web App infrastructure
+        uses: azure/arm-deploy@v2
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: infra/webapp.bicep
+          parameters: webAppName=${{ env.AZURE_WEBAPP_NAME }} location=${{ env.AZURE_LOCATION }}
+          deploymentMode: Incremental
+          failOnStdErr: false
 
-#       - name: Create staging slot if needed
-#         shell: bash
-#         run: |
-#           if az webapp deployment slot list \
-#             --resource-group "$AZURE_RESOURCE_GROUP" \
-#             --name "$AZURE_WEBAPP_NAME" \
-#             --query "[?name=='$AZURE_SLOT_NAME']" \
-#             --output tsv | grep -q .; then
-#             echo "Slot $AZURE_SLOT_NAME already exists."
-#           else
-#             az webapp deployment slot create \
-#               --resource-group "$AZURE_RESOURCE_GROUP" \
-#               --name "$AZURE_WEBAPP_NAME" \
-#               --slot "$AZURE_SLOT_NAME" \
-#               --configuration-source "$AZURE_WEBAPP_NAME"
-#           fi
+      - name: Create staging slot if needed
+        shell: bash
+        run: |
+          if az webapp deployment slot list \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --query "[?name=='$AZURE_SLOT_NAME']" \
+            --output tsv | grep -q .; then
+            echo "Slot $AZURE_SLOT_NAME already exists."
+          else
+            az webapp deployment slot create \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_WEBAPP_NAME" \
+              --slot "$AZURE_SLOT_NAME" \
+              --configuration-source "$AZURE_WEBAPP_NAME"
+          fi
 
-#   deploy-staging:
-#     name: Deploy to staging slot
-#     runs-on: ubuntu-latest
-#     needs: provision
+  deploy-staging:
+    name: Deploy to staging slot
+    runs-on: ubuntu-latest
+    needs: provision
 
-#     steps:
-#       - name: Download web application artifact
-#         uses: actions/download-artifact@v4
-#         with:
-#           name: webapp
+    steps:
+      - name: Download web application artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp
 
-#       - name: Sign in to Azure
-#         uses: azure/login@v2
-#         with:
-#           client-id: ${{ secrets.AZURE_CLIENT_ID }}
-#           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-#           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-#       - name: Deploy ZIP to staging slot
-#         uses: azure/cli@v2
-#         with:
-#           inlineScript: |
-#             az webapp deploy \
-#               --resource-group "$AZURE_RESOURCE_GROUP" \
-#               --name "$AZURE_WEBAPP_NAME" \
-#               --slot "$AZURE_SLOT_NAME" \
-#               --src-path webapp.zip \
-#               --type zip
+      - name: Deploy ZIP to staging slot
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az webapp deploy \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_WEBAPP_NAME" \
+              --slot "$AZURE_SLOT_NAME" \
+              --src-path webapp.zip \
+              --type zip
 
-#   zap:
-#     name: OWASP ZAP baseline scan
-#     runs-on: ubuntu-latest
-#     needs: deploy-staging
+  zap:
+    name: OWASP ZAP baseline scan
+    runs-on: ubuntu-latest
+    needs: deploy-staging
 
-#     steps:
-#       - name: Wait for staging slot
-#         shell: bash
-#         run: |
-#           curl --retry 15 --retry-delay 10 --retry-all-errors --fail --silent \
-#             --output /dev/null "$STAGING_URL"
+    steps:
+      - name: Wait for staging slot
+        shell: bash
+        run: |
+          curl --retry 15 --retry-delay 10 --retry-all-errors --fail --silent \
+            --output /dev/null "$STAGING_URL"
 
-#       - name: Prepare ZAP report directory
-#         shell: bash
-#         run: mkdir -p "$RUNNER_TEMP/zap"
+      - name: Prepare ZAP report directory
+        shell: bash
+        run: mkdir -p "$RUNNER_TEMP/zap"
 
-#       - name: Run ZAP baseline scan
-#         shell: bash
-#         run: |
-#           docker run --rm \
-#             --user "$(id -u):$(id -g)" \
-#             -v "$RUNNER_TEMP/zap:/zap/wrk:rw" \
-#             ghcr.io/zaproxy/zaproxy:stable \
-#             zap-baseline.py \
-#               -t "$STAGING_URL" \
-#               -r zap-report.html \
-#               -J zap-report.json \
-#               -w zap-summary.md \
-#               -I
+      - name: Run ZAP baseline scan
+        shell: bash
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -v "$RUNNER_TEMP/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "$STAGING_URL" \
+              -r zap-report.html \
+              -J zap-report.json \
+              -w zap-summary.md \
+              -I
 
-#       - name: Add ZAP summary to the run
-#         if: always()
-#         shell: bash
-#         run: |
-#           if [ -f "$RUNNER_TEMP/zap/zap-summary.md" ]; then
-#             cat "$RUNNER_TEMP/zap/zap-summary.md" >> "$GITHUB_STEP_SUMMARY"
-#           fi
+      - name: Add ZAP summary to the run
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/zap/zap-summary.md" ]; then
+            cat "$RUNNER_TEMP/zap/zap-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-#       - name: Upload ZAP reports
-#         if: always()
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: zap-report
-#           path: ${{ runner.temp }}/zap
-#           if-no-files-found: warn
-#           retention-days: 14
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: ${{ runner.temp }}/zap
+          if-no-files-found: warn
+          retention-days: 14
 
-#   swap-production:
-#     name: Swap staging into production
-#     runs-on: ubuntu-latest
-#     needs: zap
-#     environment:
-#       name: production
+  swap-production:
+    name: Swap staging into production
+    runs-on: ubuntu-latest
+    needs: zap
+    environment:
+      name: production
 
-#     steps:
-#       - name: Sign in to Azure
-#         uses: azure/login@v2
-#         with:
-#           client-id: ${{ secrets.AZURE_CLIENT_ID }}
-#           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-#           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-#       - name: Swap staging slot into production
-#         shell: bash
-#         run: |
-#           az webapp deployment slot swap \
-#             --resource-group "$AZURE_RESOURCE_GROUP" \
-#             --name "$AZURE_WEBAPP_NAME" \
-#             --slot "$AZURE_SLOT_NAME" \
-#             --target-slot production
+      - name: Swap staging slot into production
+        shell: bash
+        run: |
+          az webapp deployment slot swap \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --slot "$AZURE_SLOT_NAME" \
+            --target-slot production

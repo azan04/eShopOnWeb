@@ -7,6 +7,9 @@
 *.userosscache
 *.sln.docstates
 
+# ASP.NET Core Data Protection keys
+**/key-*.xml
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
